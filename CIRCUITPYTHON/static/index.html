@@ -1,0 +1,1890 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>picoHardwareMonitor - Integrated Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0f0f23;
+            --bg-secondary: #1a1a2e;
+            --bg-card: #16213e;
+            --accent: #00d4ff;
+            --accent-hover: #00b8e6;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0a0;
+            --success: #00ff88;
+            --warning: #ffaa00;
+            --danger: #ff4444;
+            --border: #333366;
+            --gradient-bg: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--gradient-bg);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: auto;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 25px;
+            background: linear-gradient(135deg, var(--bg-card) 0%, rgba(0, 212, 255, 0.1) 100%);
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            backdrop-filter: blur(10px);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, var(--accent) 0%, #ffffff 100%);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from { filter: drop-shadow(0 0 5px var(--accent)); }
+            to { filter: drop-shadow(0 0 15px var(--accent)); }
+        }
+
+        .status-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            background: var(--bg-card);
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 25px;
+            border: 1px solid var(--border);
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.online { background: var(--success); }
+        .status-dot.offline { background: var(--danger); }
+        .status-dot.warning { background: var(--warning); }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .tabs {
+            display: flex;
+            background: var(--bg-secondary);
+            border-radius: 15px;
+            padding: 5px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border);
+            overflow-x: auto;
+        }
+
+        .tab {
+            flex: 1;
+            min-width: 120px;
+            padding: 12px 16px;
+            text-align: center;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .tab.active {
+            background: var(--accent);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .tab:hover:not(.active) {
+            background: rgba(0, 212, 255, 0.2);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: linear-gradient(135deg, var(--bg-card) 0%, rgba(0, 212, 255, 0.05) 100%);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent), #ffffff);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 30px rgba(0, 212, 255, 0.2);
+        }
+
+        .card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .card-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        .card-icon {
+            font-size: 1.5rem;
+            opacity: 0.7;
+        }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .metric:last-child {
+            border-bottom: none;
+        }
+
+        .metric-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .metric-value {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .temperature-display {
+            text-align: center;
+            padding: 16px;
+            background: radial-gradient(circle, rgba(0, 212, 255, 0.1) 0%, transparent 70%);
+            border-radius: 12px;
+            margin: 12px 0;
+        }
+
+        .temp-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .temp-cold { color: #00aaff; }
+        .temp-normal { color: var(--success); }
+        .temp-warm { color: var(--warning); }
+        .temp-hot { color: var(--danger); }
+
+        .controls-section {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid var(--border);
+        }
+
+        .control-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .control-field {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .control-label {
+            margin-bottom: 6px;
+            font-weight: 600;
+            color: var(--accent);
+            font-size: 0.9rem;
+        }
+
+        .control-input, .control-select {
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+
+        .control-input:focus, .control-select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.2);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin: 3px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0, 212, 255, 0.3);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--border) 100%);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, var(--danger) 0%, #cc3333 100%);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--success) 0%, #00cc66 100%);
+        }
+
+        .chart-container {
+            width: 100%;
+            height: 400px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 16px;
+            margin: 16px 0;
+            border: 1px solid var(--border);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .chart-title {
+            text-align: center;
+            margin-bottom: 12px;
+            color: var(--accent);
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .log-container {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 16px;
+            margin: 16px 0;
+            border: 1px solid var(--border);
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+
+        .log-entry {
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .timestamp {
+            color: var(--text-secondary);
+            margin-right: 8px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-secondary);
+        }
+
+        .spinner {
+            border: 3px solid var(--border);
+            border-top: 3px solid var(--accent);
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error, .warning, .success {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin: 8px 0;
+            font-size: 0.9rem;
+        }
+
+        .error {
+            background: rgba(255, 68, 68, 0.1);
+            border: 1px solid var(--danger);
+            color: var(--danger);
+        }
+
+        .warning {
+            background: rgba(255, 170, 0, 0.1);
+            border: 1px solid var(--warning);
+            color: var(--warning);
+        }
+
+        .success {
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid var(--success);
+            color: var(--success);
+        }
+
+        .fan-curve-editor {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 16px;
+            margin: 16px 0;
+            border: 1px solid var(--border);
+        }
+
+        .curve-point {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 8px;
+            padding: 8px;
+            background: var(--bg-card);
+            border-radius: 8px;
+        }
+
+        .settings-section {
+            margin-bottom: 20px;
+            padding: 16px;
+            background: var(--bg-card);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .settings-title {
+            color: var(--accent);
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 1.8rem;
+            }
+            
+            .tabs {
+                flex-direction: column;
+            }
+            
+            .tab {
+                min-width: auto;
+            }
+            
+            .control-group {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔥 picoHardwareMonitor</h1>
+            <p>Integrated Hardware Monitoring, Fan Control & Overclocking Dashboard</p>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="status-dot" id="picoStatus"></div>
+                <span>🌡️ Pico: <span id="picoText">Connecting...</span></span>
+            </div>
+            <div class="status-item">
+                <div class="status-dot" id="systemStatus"></div>
+                <span>🖥️ System: <span id="systemText">Connecting...</span></span>
+            </div>
+            <div class="status-item">
+                <span>📍 Pico IP: <span id="picoIP">--</span></span>
+            </div>
+            <div class="status-item">
+                <span>🌐 System IP: <span id="systemIP">--</span></span>
+            </div>
+            <div class="status-item">
+                <span>🔄 Auto-refresh: <span id="refreshStatus">5s</span></span>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('overview')">📊 Overview</div>
+            <div class="tab" onclick="switchTab('temperatures')">🌡️ Temperatures</div>
+            <div class="tab" onclick="switchTab('system')">🖥️ System</div>
+            <div class="tab" onclick="switchTab('fans')">💨 Fan Control</div>
+            <div class="tab" onclick="switchTab('overclock')">⚡ Overclock</div>
+            <div class="tab" onclick="switchTab('settings')">⚙️ Settings</div>
+            <div class="tab" onclick="switchTab('logs')">📝 Logs</div>
+        </div>
+
+        <!-- Overview Tab -->
+        <div id="overview" class="tab-content active">
+            <div class="grid">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">🌡️ Temperature Overview</span>
+                        <span class="card-icon">🔥</span>
+                    </div>
+                    <div class="temperature-display">
+                        <div class="temp-value temp-normal" id="overviewTemp1">--°C</div>
+                        <div>External Sensor T1</div>
+                    </div>
+                    <div class="temperature-display">
+                        <div class="temp-value temp-normal" id="overviewTemp2">--°C</div>
+                        <div>External Sensor T2</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">💻 System Status</span>
+                        <span class="card-icon">🖥️</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">CPU Usage</span>
+                        <span class="metric-value" id="cpuUsage">--%</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">CPU Temp</span>
+                        <span class="metric-value" id="cpuTemp">--°C</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">GPU Usage</span>
+                        <span class="metric-value" id="gpuUsage">--%</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">GPU Temp</span>
+                        <span class="metric-value" id="gpuTemp">--°C</span>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">💾 Memory & Storage</span>
+                        <span class="card-icon">💿</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">RAM Usage</span>
+                        <span class="metric-value" id="ramUsage">--%</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">RAM Available</span>
+                        <span class="metric-value" id="ramAvailable">-- GB</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Disk Usage</span>
+                        <span class="metric-value" id="diskUsage">--%</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Disk Free</span>
+                        <span class="metric-value" id="diskFree">-- GB</span>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">💨 Fan Status</span>
+                        <span class="card-icon">🌪️</span>
+                    </div>
+                    <div id="fanOverview">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            Loading fan data...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title">Temperature History (All Sensors)</div>
+                <canvas id="overviewChart" style="width: 100%; height: 100%;"></canvas>
+            </div>
+        </div>
+
+        <!-- Temperatures Tab -->
+        <div id="temperatures" class="tab-content">
+            <div class="grid">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">🌡️ External Sensors (Pico)</span>
+                        <span class="card-icon">📡</span>
+                    </div>
+                    <div class="temperature-display">
+                        <div class="temp-value temp-normal" id="picoTemp1">--°C</div>
+                        <div>T1 - External Probe</div>
+                    </div>
+                    <div class="temperature-display">
+                        <div class="temp-value temp-normal" id="picoTemp2">--°C</div>
+                        <div>T2 - External Probe</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">🖥️ System Temperatures</span>
+                        <span class="card-icon">💻</span>
+                    </div>
+                    <div id="systemTemps">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            Loading system temperatures...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title">Temperature Monitoring</div>
+                <canvas id="tempChart" style="width: 100%; height: 100%;"></canvas>
+            </div>
+        </div>
+
+        <!-- System Tab -->
+        <div id="system" class="tab-content">
+            <div class="grid">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">🖥️ CPU Information</span>
+                        <span class="card-icon">⚡</span>
+                    </div>
+                    <div id="cpuInfo">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            Loading CPU information...
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">🎮 GPU Information</span>
+                        <span class="card-icon">🎯</span>
+                    </div>
+                    <div id="gpuInfo">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            Loading GPU information...
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">💾 Memory Information</span>
+                        <span class="card-icon">🧠</span>
+                    </div>
+                    <div id="memoryInfo">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            Loading memory information...
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">💿 Disk Information</span>
+                        <span class="card-icon">💽</span>
+                    </div>
+                    <div id="diskInfo">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            Loading disk information...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fans Tab -->
+        <div id="fans" class="tab-content">
+            <div class="controls-section">
+                <div class="settings-title">💨 Fan Control Center</div>
+                <div id="fanControls">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        Loading fan controls...
+                    </div>
+                </div>
+            </div>
+
+            <div class="fan-curve-editor" id="curveEditor" style="display: none;">
+                <h3>📈 Custom Fan Curve Editor</h3>
+                <div id="curvePoints"></div>
+                <button class="btn btn-secondary" onclick="addCurvePoint()">➕ Add Point</button>
+                <button class="btn btn-success" onclick="applyCurve()">✅ Apply Curve</button>
+            </div>
+
+            <div class="controls-section">
+                <div class="settings-title">🎛️ Quick Profiles</div>
+                <div class="control-group">
+                    <button class="btn" onclick="applyFanProfile('silent')">🤫 Silent</button>
+                    <button class="btn" onclick="applyFanProfile('balanced')">⚖️ Balanced</button>
+                    <button class="btn" onclick="applyFanProfile('performance')">🚀 Performance</button>
+                    <button class="btn" onclick="applyFanProfile('aggressive')">🔥 Aggressive</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Overclock Tab -->
+        <div id="overclock" class="tab-content">
+            <div class="warning">
+                ⚠️ <strong>Warning:</strong> Overclocking can damage your hardware. Proceed with caution and monitor temperatures closely.
+            </div>
+
+            <div class="controls-section">
+                <div class="settings-title">⚡ GPU Overclocking</div>
+                <div id="overclockControls">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        Loading overclock settings...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="settings" class="tab-content">
+            <div class="settings-section">
+                <div class="settings-title">🔗 Connection Settings</div>
+                <div class="control-group">
+                    <div class="control-field">
+                        <label class="control-label">Pico IP Address</label>
+                        <input type="text" class="control-input" id="picoIPInput" placeholder="192.168.1.100">
+                    </div>
+                    <div class="control-field">
+                        <label class="control-label">System API Address</label>
+                        <input type="text" class="control-input" id="systemAPIInput" placeholder="192.168.1.183:8080">
+                    </div>
+                </div>
+                <button class="btn" onclick="saveConnections()">💾 Save Connections</button>
+                <button class="btn btn-secondary" onclick="testConnections()">🔍 Test Connections</button>
+            </div>
+
+            <div class="settings-section">
+                <div class="settings-title">⏱️ Monitoring Settings</div>
+                <div class="control-group">
+                    <div class="control-field">
+                        <label class="control-label">Refresh Interval</label>
+                        <select class="control-select" id="refreshSelect" onchange="updateRefreshInterval()">
+                            <option value="1">1 second</option>
+                            <option value="2">2 seconds</option>
+                            <option value="5" selected>5 seconds</option>
+                            <option value="10">10 seconds</option>
+                            <option value="30">30 seconds</option>
+                        </select>
+                    </div>
+                    <div class="control-field">
+                        <label class="control-label">Temperature Unit</label>
+                        <select class="control-select" id="tempUnit" onchange="updateTempUnit()">
+                            <option value="C" selected>Celsius (°C)</option>
+                            <option value="F">Fahrenheit (°F)</option>
+                            <option value="K">Kelvin (K)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <div class="settings-title">🔧 System Controls</div>
+                <div class="control-group">
+                    <button class="btn" onclick="toggleAutoRefresh()" id="autoRefreshBtn">⏸️ Pause Auto-refresh</button>
+                    <button class="btn btn-secondary" onclick="resetAllData()">🔄 Reset All Data</button>
+                    <button class="btn btn-secondary" onclick="exportSettings()">💾 Export Settings</button>
+                    <button class="btn btn-secondary" onclick="importSettings()">📂 Import Settings</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logs Tab -->
+        <div id="logs" class="tab-content">
+            <div class="controls-section">
+                <div class="settings-title">📝 System Logs</div>
+                <div class="control-group">
+                    <button class="btn btn-secondary" onclick="clearLogs()">🗑️ Clear Logs</button>
+                    <button class="btn btn-secondary" onclick="saveLogs()">💾 Save Logs</button>
+                    <button class="btn btn-secondary" onclick="toggleAutoScroll()" id="autoScrollBtn">📜 Auto-scroll: ON</button>
+                </div>
+            </div>
+            
+            <div class="log-container" id="logContainer">
+                <div class="log-entry">
+                    <span class="timestamp">[System]</span>
+                    <span>🚀 Integrated Hardware Monitor initialized</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global Configuration
+        let config = {
+            picoIP: localStorage.getItem('picoIP') || '192.168.1.100',
+            systemAPI: localStorage.getItem('systemAPI') || '192.168.1.183:8080',
+            refreshInterval: parseInt(localStorage.getItem('refreshInterval')) || 5,
+            tempUnit: localStorage.getItem('tempUnit') || 'C',
+            alertThreshold: parseInt(localStorage.getItem('alertThreshold')) || 70,
+            audioAlerts: localStorage.getItem('audioAlerts') === 'true',
+            autoRefresh: true,
+            autoScroll: true
+        };
+
+        // Data storage
+        let data = {
+            pico: { t1: null, t2: null, health: null },
+            system: { 
+                cpu: null, 
+                gpu: [], 
+                memory: null, 
+                disk: [], 
+                temps: null, 
+                fans: [], 
+                health: null 
+            },
+            history: {
+                timestamps: [],
+                t1: [],
+                t2: [],
+                cpuTemp: [],
+                gpuTemp: []
+            }
+        };
+
+        // Interval references
+        let refreshIntervalId = null;
+        let chartUpdateId = null;
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
+
+        function initializeApp() {
+            loadSettings();
+            updateStatusDisplay();
+            startAutoRefresh();
+            initializeCharts();
+            logMessage('🚀 picoHardwareMonitor initialized');
+        }
+
+        function loadSettings() {
+            document.getElementById('picoIPInput').value = config.picoIP;
+            document.getElementById('systemAPIInput').value = config.systemAPI;
+            document.getElementById('refreshSelect').value = config.refreshInterval;
+            document.getElementById('tempUnit').value = config.tempUnit;
+        }
+
+        // === API FUNCTIONS ===
+
+        async function fetchPicoData() {
+            try {
+                // Fetch temperature data
+                const tempResponse = await fetch(`http://${config.picoIP}/api/temps`);
+                if (tempResponse.ok) {
+                    const tempData = await tempResponse.json();
+                    data.pico.t1 = tempData.sensors.find(s => s.name === 'T1')?.temperature_celsius;
+                    data.pico.t2 = tempData.sensors.find(s => s.name === 'T2')?.temperature_celsius;
+                    updatePicoStatus('online');
+                } else {
+                    throw new Error('Temperature data fetch failed');
+                }
+
+                // Fetch health data
+                const healthResponse = await fetch(`http://${config.picoIP}/api/health`);
+                if (healthResponse.ok) {
+                    data.pico.health = await healthResponse.json();
+                }
+
+                return true;
+            } catch (error) {
+                console.error('Pico fetch error:', error);
+                updatePicoStatus('offline');
+                data.pico.t1 = null;
+                data.pico.t2 = null;
+                return false;
+            }
+        }
+
+        async function fetchSystemData() {
+            try {
+                const baseUrl = `http://${config.systemAPI}/api`;
+                
+                // Fetch all system data in parallel
+                const [healthRes, cpuRes, gpuRes, memoryRes, diskRes, tempsRes, fansRes] = await Promise.all([
+                    fetch(`${baseUrl}/health`).catch(() => null),
+                    fetch(`${baseUrl}/cpu`).catch(() => null),
+                    fetch(`${baseUrl}/gpu`).catch(() => null),
+                    fetch(`${baseUrl}/memory`).catch(() => null),
+                    fetch(`${baseUrl}/disk`).catch(() => null),
+                    fetch(`${baseUrl}/temps`).catch(() => null),
+                    fetch(`${baseUrl}/fan`).catch(() => null)
+                ]);
+
+                let successCount = 0;
+
+                if (healthRes?.ok) {
+                    data.system.health = await healthRes.json();
+                    successCount++;
+                }
+                if (cpuRes?.ok) {
+                    data.system.cpu = await cpuRes.json();
+                    successCount++;
+                }
+                if (gpuRes?.ok) {
+                    data.system.gpu = await gpuRes.json();
+                    successCount++;
+                }
+                if (memoryRes?.ok) {
+                    data.system.memory = await memoryRes.json();
+                    successCount++;
+                }
+                if (diskRes?.ok) {
+                    data.system.disk = await diskRes.json();
+                    successCount++;
+                }
+                if (tempsRes?.ok) {
+                    data.system.temps = await tempsRes.json();
+                    successCount++;
+                }
+                if (fansRes?.ok) {
+                    data.system.fans = await fansRes.json();
+                    successCount++;
+                }
+
+                if (successCount > 0) {
+                    updateSystemStatus('online');
+                    return true;
+                } else {
+                    throw new Error('No system endpoints responded');
+                }
+            } catch (error) {
+                console.error('System fetch error:', error);
+                updateSystemStatus('offline');
+                return false;
+            }
+        }
+
+        async function refreshAllData() {
+            const picoSuccess = await fetchPicoData();
+            const systemSuccess = await fetchSystemData();
+            
+            updateDisplays();
+            updateHistory();
+            
+            if (picoSuccess || systemSuccess) {
+                checkAlerts();
+            }
+        }
+
+        // === STATUS FUNCTIONS ===
+
+        function updatePicoStatus(status) {
+            const statusDot = document.getElementById('picoStatus');
+            const statusText = document.getElementById('picoText');
+            const ipElement = document.getElementById('picoIP');
+            
+            statusDot.className = `status-dot ${status}`;
+            statusText.textContent = status === 'online' ? 'Connected' : 'Offline';
+            ipElement.textContent = config.picoIP;
+        }
+
+        function updateSystemStatus(status) {
+            const statusDot = document.getElementById('systemStatus');
+            const statusText = document.getElementById('systemText');
+            const ipElement = document.getElementById('systemIP');
+            
+            statusDot.className = `status-dot ${status}`;
+            statusText.textContent = status === 'online' ? 'Connected' : 'Offline';
+            ipElement.textContent = config.systemAPI;
+        }
+
+        function updateStatusDisplay() {
+            document.getElementById('refreshStatus').textContent = config.autoRefresh ? `${config.refreshInterval}s` : 'Paused';
+        }
+
+        // === DISPLAY UPDATE FUNCTIONS ===
+
+        function updateDisplays() {
+            updateTemperatureDisplays();
+            updateSystemDisplays();
+            updateFanDisplays();
+            updateTabContent();
+        }
+
+        function updateTemperatureDisplays() {
+            // Update Pico temperatures in all relevant places
+            const t1Formatted = formatTemperature(data.pico.t1);
+            const t2Formatted = formatTemperature(data.pico.t2);
+            
+            // Overview tab
+            updateTemperatureElement('overviewTemp1', data.pico.t1, t1Formatted);
+            updateTemperatureElement('overviewTemp2', data.pico.t2, t2Formatted);
+            
+            // Temperature tab
+            updateTemperatureElement('picoTemp1', data.pico.t1, t1Formatted);
+            updateTemperatureElement('picoTemp2', data.pico.t2, t2Formatted);
+        }
+
+        function updateTemperatureElement(elementId, tempValue, formattedValue) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.textContent = formattedValue;
+                element.className = `temp-value ${getTemperatureClass(tempValue)}`;
+            }
+        }
+
+        function updateSystemDisplays() {
+            // CPU
+            if (data.system.cpu) {
+                updateElement('cpuUsage', `${data.system.cpu.usage_percent.toFixed(1)}%`);
+                updateElement('cpuTemp', formatTemperature(getCpuTemperature()));
+            }
+
+            // GPU
+            if (data.system.gpu && data.system.gpu.length > 0) {
+                const gpu = data.system.gpu[0];
+                updateElement('gpuUsage', `${gpu.usage_percent}%`);
+                updateElement('gpuTemp', formatTemperature(gpu.temperature_celsius));
+            }
+
+            // Memory
+            if (data.system.memory) {
+                updateElement('ramUsage', `${data.system.memory.usage_percent.toFixed(1)}%`);
+                updateElement('ramAvailable', `${(data.system.memory.available_mb / 1024).toFixed(1)} GB`);
+            }
+
+            // Disk
+            if (data.system.disk && data.system.disk.length > 0) {
+                const disk = data.system.disk[0];
+                updateElement('diskUsage', `${disk.usage_percent.toFixed(1)}%`);
+                updateElement('diskFree', `${(disk.available_mb / 1024).toFixed(1)} GB`);
+            }
+        }
+
+        function updateFanDisplays() {
+            const fanOverview = document.getElementById('fanOverview');
+            
+            if (data.system.fans && data.system.fans.length > 0) {
+                let html = '';
+                data.system.fans.forEach((fan, index) => {
+                    html += `
+                        <div class="metric">
+                            <span class="metric-label">${fan.name || `Fan ${index + 1}`}</span>
+                            <span class="metric-value">${fan.rpm} RPM (${fan.speed_percent}%)</span>
+                        </div>
+                    `;
+                });
+                fanOverview.innerHTML = html;
+            } else {
+                fanOverview.innerHTML = '<div class="loading">No fan data available</div>';
+            }
+        }
+
+        function updateTabContent() {
+            const currentTab = document.querySelector('.tab.active').onclick.toString().match(/'(\w+)'/)?.[1];
+            
+            if (currentTab === 'system') {
+                updateSystemTabContent();
+            } else if (currentTab === 'fans') {
+                updateFansTabContent();
+            } else if (currentTab === 'temperatures') {
+                updateTemperaturesTabContent();
+            }
+        }
+
+        function updateSystemTabContent() {
+            // CPU Info
+            if (data.system.cpu) {
+                document.getElementById('cpuInfo').innerHTML = `
+                    <div class="metric">
+                        <span class="metric-label">Model</span>
+                        <span class="metric-value">${data.system.cpu.model || 'Unknown'}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Cores</span>
+                        <span class="metric-value">${data.system.cpu.cores}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Threads</span>
+                        <span class="metric-value">${data.system.cpu.threads}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Frequency</span>
+                        <span class="metric-value">${data.system.cpu.frequency_mhz} MHz</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Usage</span>
+                        <span class="metric-value">${data.system.cpu.usage_percent.toFixed(1)}%</span>
+                    </div>
+                `;
+            }
+
+            // GPU Info
+            if (data.system.gpu && data.system.gpu.length > 0) {
+                const gpu = data.system.gpu[0];
+                document.getElementById('gpuInfo').innerHTML = `
+                    <div class="metric">
+                        <span class="metric-label">Model</span>
+                        <span class="metric-value">${gpu.model}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Vendor</span>
+                        <span class="metric-value">${gpu.vendor.toUpperCase()}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">VRAM</span>
+                        <span class="metric-value">${gpu.vram_mb} MB</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Usage</span>
+                        <span class="metric-value">${gpu.usage_percent}%</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Temperature</span>
+                        <span class="metric-value">${formatTemperature(gpu.temperature_celsius)}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Power</span>
+                        <span class="metric-value">${gpu.power_usage_watts} W</span>
+                    </div>
+                `;
+            }
+
+            // Memory Info
+            if (data.system.memory) {
+                document.getElementById('memoryInfo').innerHTML = `
+                    <div class="metric">
+                        <span class="metric-label">Total</span>
+                        <span class="metric-value">${(data.system.memory.total_mb / 1024).toFixed(1)} GB</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Used</span>
+                        <span class="metric-value">${(data.system.memory.used_mb / 1024).toFixed(1)} GB</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Available</span>
+                        <span class="metric-value">${(data.system.memory.available_mb / 1024).toFixed(1)} GB</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Usage</span>
+                        <span class="metric-value">${data.system.memory.usage_percent.toFixed(1)}%</span>
+                    </div>
+                `;
+            }
+
+            // Disk Info
+            if (data.system.disk && data.system.disk.length > 0) {
+                let html = '';
+                data.system.disk.forEach(disk => {
+                    html += `
+                        <div style="margin-bottom: 15px; padding: 10px; background: var(--bg-secondary); border-radius: 8px;">
+                            <div class="metric">
+                                <span class="metric-label">Device</span>
+                                <span class="metric-value">${disk.device}</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Mount Point</span>
+                                <span class="metric-value">${disk.mountpoint}</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Total</span>
+                                <span class="metric-value">${(disk.total_mb / 1024).toFixed(1)} GB</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Used</span>
+                                <span class="metric-value">${(disk.used_mb / 1024).toFixed(1)} GB (${disk.usage_percent.toFixed(1)}%)</span>
+                            </div>
+                        </div>
+                    `;
+                });
+                document.getElementById('diskInfo').innerHTML = html;
+            }
+        }
+
+        function updateTemperaturesTabContent() {
+            // System temperatures
+            if (data.system.temps) {
+                let html = '';
+                
+                if (data.system.temps.cpu && data.system.temps.cpu.length > 0) {
+                    data.system.temps.cpu.forEach(sensor => {
+                        html += `
+                            <div class="metric">
+                                <span class="metric-label">${sensor.label}</span>
+                                <span class="metric-value">${formatTemperature(sensor.temperature_celsius)}</span>
+                            </div>
+                        `;
+                    });
+                }
+                
+                if (data.system.temps.gpu && data.system.temps.gpu.length > 0) {
+                    data.system.temps.gpu.forEach(sensor => {
+                        html += `
+                            <div class="metric">
+                                <span class="metric-label">GPU ${sensor.label}</span>
+                                <span class="metric-value">${formatTemperature(sensor.temperature_celsius)}</span>
+                            </div>
+                        `;
+                    });
+                }
+                
+                document.getElementById('systemTemps').innerHTML = html || '<div class="loading">No temperature sensors found</div>';
+            }
+        }
+
+        function updateFansTabContent() {
+            if (data.system.fans && data.system.fans.length > 0) {
+                let html = '';
+                data.system.fans.forEach((fan, index) => {
+                    html += `
+                        <div class="settings-section">
+                            <div class="settings-title">💨 ${fan.name || `Fan ${index + 1}`}</div>
+                            <div class="metric">
+                                <span class="metric-label">Current RPM</span>
+                                <span class="metric-value">${fan.rpm} RPM</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Speed</span>
+                                <span class="metric-value">${fan.speed_percent}%</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Max RPM</span>
+                                <span class="metric-value">${fan.max_rpm} RPM</span>
+                            </div>
+                            <div class="control-group">
+                                <button class="btn" onclick="setFanMode(${index}, 'auto')">🔄 Auto</button>
+                                <button class="btn" onclick="setFanFixed(${index}, 50)">⚖️ 50%</button>
+                                <button class="btn" onclick="setFanFixed(${index}, 75)">🚀 75%</button>
+                                <button class="btn" onclick="setFanFixed(${index}, 100)">🔥 100%</button>
+                            </div>
+                            <div class="control-group">
+                                <div class="control-field">
+                                    <label class="control-label">Custom Speed (%)</label>
+                                    <input type="number" class="control-input" id="fanSpeed${index}" min="0" max="100" value="50">
+                                </div>
+                                <button class="btn btn-secondary" onclick="setFanCustom(${index})">Set Speed</button>
+                            </div>
+                        </div>
+                    `;
+                });
+                document.getElementById('fanControls').innerHTML = html;
+            }
+        }
+
+        // === FAN CONTROL FUNCTIONS ===
+
+        async function setFanMode(fanId, mode) {
+            try {
+                const response = await fetch(`http://${config.systemAPI}/api/fan/${fanId}/settings`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mode: mode })
+                });
+                
+                if (response.ok) {
+                    logMessage(`✅ Fan ${fanId} set to ${mode} mode`);
+                } else {
+                    throw new Error(`Failed to set fan mode: ${response.status}`);
+                }
+            } catch (error) {
+                logMessage(`❌ Error setting fan mode: ${error.message}`, 'error');
+            }
+        }
+
+        async function setFanFixed(fanId, speed) {
+            try {
+                const response = await fetch(`http://${config.systemAPI}/api/fan/${fanId}/settings`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        mode: 'fixed',
+                        fixed_speed_percent: speed
+                    })
+                });
+                
+                if (response.ok) {
+                    logMessage(`✅ Fan ${fanId} set to ${speed}% fixed speed`);
+                } else {
+                    throw new Error(`Failed to set fan speed: ${response.status}`);
+                }
+            } catch (error) {
+                logMessage(`❌ Error setting fan speed: ${error.message}`, 'error');
+            }
+        }
+
+        async function setFanCustom(fanId) {
+            const speed = parseInt(document.getElementById(`fanSpeed${fanId}`).value);
+            if (speed >= 0 && speed <= 100) {
+                await setFanFixed(fanId, speed);
+            } else {
+                logMessage('❌ Speed must be between 0 and 100%', 'error');
+            }
+        }
+
+        async function applyFanProfile(profile) {
+            const profiles = {
+                silent: [
+                    {temperature_celsius: 35, fan_speed_percent: 15},
+                    {temperature_celsius: 50, fan_speed_percent: 25},
+                    {temperature_celsius: 65, fan_speed_percent: 45},
+                    {temperature_celsius: 75, fan_speed_percent: 70}
+                ],
+                balanced: [
+                    {temperature_celsius: 30, fan_speed_percent: 20},
+                    {temperature_celsius: 50, fan_speed_percent: 50},
+                    {temperature_celsius: 70, fan_speed_percent: 80},
+                    {temperature_celsius: 85, fan_speed_percent: 100}
+                ],
+                performance: [
+                    {temperature_celsius: 20, fan_speed_percent: 30},
+                    {temperature_celsius: 35, fan_speed_percent: 50},
+                    {temperature_celsius: 50, fan_speed_percent: 70},
+                    {temperature_celsius: 65, fan_speed_percent: 90},
+                    {temperature_celsius: 75, fan_speed_percent: 100}
+                ],
+                aggressive: [
+                    {temperature_celsius: 25, fan_speed_percent: 30},
+                    {temperature_celsius: 40, fan_speed_percent: 50},
+                    {temperature_celsius: 55, fan_speed_percent: 70},
+                    {temperature_celsius: 70, fan_speed_percent: 90},
+                    {temperature_celsius: 80, fan_speed_percent: 100}
+                ]
+            };
+
+            if (data.system.fans && data.system.fans.length > 0) {
+                for (let i = 0; i < data.system.fans.length; i++) {
+                    try {
+                        const response = await fetch(`http://${config.systemAPI}/api/fan/${i}/settings`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                mode: 'curve',
+                                curve: profiles[profile]
+                            })
+                        });
+                        
+                        if (response.ok) {
+                            logMessage(`✅ Applied ${profile} profile to Fan ${i}`);
+                        }
+                    } catch (error) {
+                        logMessage(`❌ Error applying profile to Fan ${i}: ${error.message}`, 'error');
+                    }
+                }
+            }
+        }
+
+        // === OVERCLOCK FUNCTIONS ===
+
+        async function loadOverclockSettings() {
+            if (data.system.gpu && data.system.gpu.length > 0) {
+                try {
+                    const response = await fetch(`http://${config.systemAPI}/api/gpu/0/overclock`);
+                    if (response.ok) {
+                        const settings = await response.json();
+                        document.getElementById('overclockControls').innerHTML = `
+                            <div class="control-group">
+                                <div class="control-field">
+                                    <label class="control-label">Core Clock Offset (MHz)</label>
+                                    <input type="number" class="control-input" id="coreOffset" value="${settings.core_clock_offset_mhz}" min="-500" max="500">
+                                </div>
+                                <div class="control-field">
+                                    <label class="control-label">Memory Clock Offset (MHz)</label>
+                                    <input type="number" class="control-input" id="memoryOffset" value="${settings.memory_clock_offset_mhz}" min="-1000" max="1000">
+                                </div>
+                                <div class="control-field">
+                                    <label class="control-label">Power Limit (%)</label>
+                                    <input type="number" class="control-input" id="powerLimit" value="${settings.power_limit_percent}" min="50" max="150">
+                                </div>
+                                <div class="control-field">
+                                    <label class="control-label">GPU Fan Speed (%)</label>
+                                    <input type="number" class="control-input" id="gpuFanSpeed" value="${settings.fan_speed_percent}" min="0" max="100">
+                                </div>
+                            </div>
+                            <div class="control-group">
+                                <button class="btn btn-warning" onclick="applyOverclock()">⚡ Apply Settings</button>
+                                <button class="btn btn-secondary" onclick="resetOverclock()">🔄 Reset to Default</button>
+                                <button class="btn btn-danger" onclick="loadOverclockSettings()">📊 Refresh Settings</button>
+                            </div>
+                        `;
+                    }
+                } catch (error) {
+                    document.getElementById('overclockControls').innerHTML = 
+                        '<div class="error">Failed to load overclock settings. GPU may not support overclocking.</div>';
+                }
+            } else {
+                document.getElementById('overclockControls').innerHTML = 
+                    '<div class="warning">No compatible GPU detected for overclocking.</div>';
+            }
+        }
+
+        async function applyOverclock() {
+            try {
+                const settings = {
+                    core_clock_offset_mhz: parseInt(document.getElementById('coreOffset').value),
+                    memory_clock_offset_mhz: parseInt(document.getElementById('memoryOffset').value),
+                    power_limit_percent: parseInt(document.getElementById('powerLimit').value),
+                    fan_speed_percent: parseInt(document.getElementById('gpuFanSpeed').value)
+                };
+
+                const response = await fetch(`http://${config.systemAPI}/api/gpu/0/overclock`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(settings)
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    logMessage('✅ Overclock settings applied successfully');
+                    if (result.warnings && result.warnings.length > 0) {
+                        result.warnings.forEach(warning => logMessage(`⚠️ ${warning}`, 'warning'));
+                    }
+                } else {
+                    throw new Error(`Failed to apply overclock: ${response.status}`);
+                }
+            } catch (error) {
+                logMessage(`❌ Error applying overclock: ${error.message}`, 'error');
+            }
+        }
+
+        async function resetOverclock() {
+            try {
+                const defaultSettings = {
+                    core_clock_offset_mhz: 0,
+                    memory_clock_offset_mhz: 0,
+                    power_limit_percent: 100,
+                    fan_speed_percent: 0
+                };
+
+                const response = await fetch(`http://${config.systemAPI}/api/gpu/0/overclock`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(defaultSettings)
+                });
+
+                if (response.ok) {
+                    logMessage('✅ Overclock settings reset to default');
+                    loadOverclockSettings();
+                } else {
+                    throw new Error(`Failed to reset overclock: ${response.status}`);
+                }
+            } catch (error) {
+                logMessage(`❌ Error resetting overclock: ${error.message}`, 'error');
+            }
+        }
+
+        // === UTILITY FUNCTIONS ===
+
+        function formatTemperature(tempC) {
+            if (tempC === null || tempC === undefined) return '--°C';
+            
+            switch(config.tempUnit) {
+                case 'F':
+                    return `${(tempC * 9/5 + 32).toFixed(1)}°F`;
+                case 'K':
+                    return `${(tempC + 273.15).toFixed(1)}K`;
+                default:
+                    return `${tempC.toFixed(1)}°C`;
+            }
+        }
+
+        function getTemperatureClass(tempC) {
+            if (tempC === null || tempC === undefined) return 'temp-normal';
+            if (tempC < 30) return 'temp-cold';
+            if (tempC < 60) return 'temp-normal';
+            if (tempC < 80) return 'temp-warm';
+            return 'temp-hot';
+        }
+
+        function getCpuTemperature() {
+            if (data.system.temps?.cpu && data.system.temps.cpu.length > 0) {
+                return data.system.temps.cpu[0].temperature_celsius;
+            }
+            return null;
+        }
+
+        function updateElement(id, value) {
+            const element = document.getElementById(id);
+            if (element) element.textContent = value;
+        }
+
+        function updateHistory() {
+            const now = new Date();
+            data.history.timestamps.push(now);
+            data.history.t1.push(data.pico.t1);
+            data.history.t2.push(data.pico.t2);
+            data.history.cpuTemp.push(getCpuTemperature());
+            data.history.gpuTemp.push(data.system.gpu?.[0]?.temperature_celsius);
+
+            // Keep only last 50 data points
+            const maxPoints = 50;
+            if (data.history.timestamps.length > maxPoints) {
+                data.history.timestamps = data.history.timestamps.slice(-maxPoints);
+                data.history.t1 = data.history.t1.slice(-maxPoints);
+                data.history.t2 = data.history.t2.slice(-maxPoints);
+                data.history.cpuTemp = data.history.cpuTemp.slice(-maxPoints);
+                data.history.gpuTemp = data.history.gpuTemp.slice(-maxPoints);
+            }
+
+            updateCharts();
+        }
+
+        function checkAlerts() {
+            const temps = [data.pico.t1, data.pico.t2, getCpuTemperature()];
+            const maxTemp = Math.max(...temps.filter(t => t !== null && t !== undefined));
+            
+            if (maxTemp > config.alertThreshold) {
+                logMessage(`🚨 High temperature alert: ${maxTemp.toFixed(1)}°C`, 'error');
+                if (config.audioAlerts) {
+                    playAlertSound();
+                }
+            }
+        }
+
+        function playAlertSound() {
+            // Simple beep using Web Audio API
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.frequency.value = 800;
+                oscillator.type = 'square';
+                
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.5);
+            } catch (error) {
+                console.warn('Audio alert failed:', error);
+            }
+        }
+
+        // === CHART FUNCTIONS ===
+
+        function initializeCharts() {
+            // Simple canvas-based charts would be implemented here
+            // For now, we'll use a placeholder
+            updateCharts();
+        }
+
+        function updateCharts() {
+            drawChart('overviewChart');
+            drawChart('tempChart');
+        }
+
+        function drawChart(canvasId) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, width, height);
+            
+            // Draw background
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, width, height);
+            
+            if (data.history.timestamps.length < 2) {
+                ctx.fillStyle = '#a0a0a0';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('Collecting data...', width/2, height/2);
+                return;
+            }
+            
+            // Draw grid
+            ctx.strokeStyle = '#333366';
+            ctx.lineWidth = 1;
+            
+            // Vertical lines
+            for (let i = 0; i <= 10; i++) {
+                const x = (width / 10) * i;
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, height);
+                ctx.stroke();
+            }
+            
+            // Horizontal lines
+            for (let i = 0; i <= 5; i++) {
+                const y = (height / 5) * i;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(width, y);
+                ctx.stroke();
+            }
+            
+            // Find temperature range
+            const allTemps = [
+                ...data.history.t1.filter(t => t !== null),
+                ...data.history.t2.filter(t => t !== null),
+                ...data.history.cpuTemp.filter(t => t !== null),
+                ...data.history.gpuTemp.filter(t => t !== null)
+            ];
+            
+            if (allTemps.length === 0) return;
+            
+            const minTemp = Math.min(...allTemps) - 5;
+            const maxTemp = Math.max(...allTemps) + 5;
+            const tempRange = maxTemp - minTemp;
+            
+            // Draw temperature lines
+            const datasets = [
+                { data: data.history.t1, color: '#00d4ff', label: 'T1' },
+                { data: data.history.t2, color: '#00ff88', label: 'T2' },
+                { data: data.history.cpuTemp, color: '#ffaa00', label: 'CPU' },
+                { data: data.history.gpuTemp, color: '#ff4444', label: 'GPU' }
+            ];
+            
+            datasets.forEach(dataset => {
+                if (dataset.data.some(v => v !== null)) {
+                    ctx.strokeStyle = dataset.color;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    
+                    let firstPoint = true;
+                    dataset.data.forEach((temp, index) => {
+                        if (temp !== null) {
+                            const x = (index / (data.history.timestamps.length - 1)) * width;
+                            const y = height - ((temp - minTemp) / tempRange) * height;
+                            
+                            if (firstPoint) {
+                                ctx.moveTo(x, y);
+                                firstPoint = false;
+                            } else {
+                                ctx.lineTo(x, y);
+                            }
+                        }
+                    });
+                    
+                    ctx.stroke();
+                }
+            });
+            
+            // Draw temperature scale
+            ctx.fillStyle = '#a0a0a0';
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'right';
+            
+            for (let i = 0; i <= 5; i++) {
+                const temp = maxTemp - (tempRange / 5) * i;
+                const y = (height / 5) * i;
+                ctx.fillText(`${temp.toFixed(0)}°C`, width - 5, y + 4);
+            }
+        }
+
+        // === AUTO REFRESH ===
+
+        function startAutoRefresh() {
+            if (refreshIntervalId) {
+                clearInterval(refreshIntervalId);
+            }
+            
+            if (config.autoRefresh) {
+                refreshIntervalId = setInterval(refreshAllData, config.refreshInterval * 1000);
+                refreshAllData(); // Initial load
+            }
+        }
+
+        function toggleAutoRefresh() {
+            config.autoRefresh = !config.autoRefresh;
+            const btn = document.getElementById('autoRefreshBtn');
+            btn.textContent = config.autoRefresh ? '⏸️ Pause Auto-refresh' : '▶️ Resume Auto-refresh';
+            
+            updateStatusDisplay();
+            startAutoRefresh();
+            
+            logMessage(config.autoRefresh ? '▶️ Auto-refresh resumed' : '⏸️ Auto-refresh paused');
+        }
+
+        function updateRefreshInterval() {
+            config.refreshInterval = parseInt(document.getElementById('refreshSelect').value);
+            localStorage.setItem('refreshInterval', config.refreshInterval);
+            updateStatusDisplay();
+            startAutoRefresh();
+            logMessage(`🔄 Refresh interval updated to ${config.refreshInterval}s`);
+        }
+
+        // === TAB SWITCHING ===
+
+        function switchTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            document.getElementById(tabName).classList.add('active');
+            
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+            
+            // Load tab-specific content
+            if (tabName === 'overclock') {
+                loadOverclockSettings();
+            }
+            
+            updateTabContent();
+        }
+
+        // === SETTINGS FUNCTIONS ===
+
+        function saveConnections() {
+            config.picoIP = document.getElementById('picoIPInput').value;
+            config.systemAPI = document.getElementById('systemAPIInput').value;
+            
+            localStorage.setItem('picoIP', config.picoIP);
+            localStorage.setItem('systemAPI', config.systemAPI);
+            
+            updateStatusDisplay();
+            logMessage('💾 Connection settings saved');
+        }
+
+        async function testConnections() {
+            logMessage('🔍 Testing connections...');
+            
+            const picoSuccess = await fetchPicoData();
+            const systemSuccess = await fetchSystemData();
+            
+            if (picoSuccess && systemSuccess) {
+                logMessage('✅ All connections successful');
+            } else if (picoSuccess) {
+                logMessage('⚠️ Pico connected, system API failed', 'warning');
+            } else if (systemSuccess) {
+                logMessage('⚠️ System API connected, Pico failed', 'warning');
+            } else {
+                logMessage('❌ All connections failed', 'error');
+            }
+        }
+
+        function updateTempUnit() {
+            config.tempUnit = document.getElementById('tempUnit').value;
+            localStorage.setItem('tempUnit', config.tempUnit);
+            updateDisplays();
+            logMessage(`🌡️ Temperature unit changed to ${config.tempUnit}`);
+        }
+
+        function resetAllData() {
+            data.history = {
+                timestamps: [],
+                t1: [],
+                t2: [],
+                cpuTemp: [],
+                gpuTemp: []
+            };
+            updateCharts();
+            logMessage('🔄 All data reset');
+        }
+
+        function exportSettings() {
+            const settings = {
+                picoIP: config.picoIP,
+                systemAPI: config.systemAPI,
+                refreshInterval: config.refreshInterval,
+                tempUnit: config.tempUnit,
+                alertThreshold: config.alertThreshold,
+                audioAlerts: config.audioAlerts
+            };
+            
+            const blob = new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'pico-monitor-settings.json';
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            logMessage('💾 Settings exported');
+        }
+
+        function importSettings() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        try {
+                            const settings = JSON.parse(e.target.result);
+                            Object.assign(config, settings);
+                            
+                            // Save to localStorage
+                            Object.keys(settings).forEach(key => {
+                                localStorage.setItem(key, settings[key]);
+                            });
+                            
+                            loadSettings();
+                            updateStatusDisplay();
+                            logMessage('📂 Settings imported successfully');
+                        } catch (error) {
+                            logMessage('❌ Failed to import settings: Invalid file', 'error');
+                        }
+                    };
+                    reader.readAsText(file);
+                }
+            };
+            input.click();
+        }
+
+        // === LOGGING ===
+
+        function logMessage(message, type = 'info') {
+            const logContainer = document.getElementById('logContainer');
+            const timestamp = new Date().toLocaleTimeString();
+            
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            logEntry.innerHTML = `
+                <span class="timestamp">[${timestamp}]</span>
+                <span class="${type}">${message}</span>
+            `;
+            
+            logContainer.appendChild(logEntry);
+            
+            // Auto-scroll if enabled
+            if (config.autoScroll) {
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
+            
+            // Keep only last 100 log entries
+            while (logContainer.children.length > 100) {
+                logContainer.removeChild(logContainer.firstChild);
+            }
+        }
+
+        function clearLogs() {
+            document.getElementById('logContainer').innerHTML = '';
+            logMessage('🗑️ Logs cleared');
+        }
+
+        function saveLogs() {
+            const logs = Array.from(document.getElementById('logContainer').children)
+                .map(entry => entry.textContent).join('\n');
+            
+            const blob = new Blob([logs], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `pico-monitor-logs-${new Date().toISOString().split('T')[0]}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            logMessage('💾 Logs saved');
+        }
+
+        function toggleAutoScroll() {
+            config.autoScroll = !config.autoScroll;
+            const btn = document.getElementById('autoScrollBtn');
+            btn.textContent = `📜 Auto-scroll: ${config.autoScroll ? 'ON' : 'OFF'}`;
+            logMessage(`📜 Auto-scroll ${config.autoScroll ? 'enabled' : 'disabled'}`);
+        }
+    </script>
+</body>
+</html>
